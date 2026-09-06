@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile representation",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "createdAt", "lastLoginAt"]
+    },
+    "Journal": {
+      "title": "Journal",
+      "description": "Personal journal entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "journalId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 300 },
+        "content": { "type": "string", "maxLength": 50000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "userId": { "type": "string" },
+        "tags": { "type": "array" },
+        "mood": { "type": "string", "maxLength": 50 },
+        "aiSummary": { "type": "string", "maxLength": 5000 }
+      },
+      "required": ["title", "content", "createdAt", "updatedAt", "userId", "tags", "mood"]
+    },
+    "JournalMessage": {
+      "title": "JournalMessage",
+      "description": "Discussion message or Gemini reflection on a specific journal entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "messageId": { "type": "string" },
+        "userId": { "type": "string" },
+        "journalId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string", "maxLength": 10000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "journalId", "role", "content", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Gemini reflection and brainstorming conversation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "journalId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 200 },
+        "messages": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "messages", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User account document"
+    },
+    "/users/{userId}/journals/{journalId}": {
+      "schema": "Journal",
+      "description": "User private journal entries"
+    },
+    "/users/{userId}/journals/{journalId}/messages/{messageId}": {
+      "schema": "JournalMessage",
+      "description": "User journal reflection messages"
+    },
+    "/users/{userId}/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "User private Gemini conversations"
+    }
+  }
+}

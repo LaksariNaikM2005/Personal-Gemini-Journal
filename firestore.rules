@@ -1,0 +1,84 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Security Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid &&
+        data.email is string &&
+        data.email.size() <= 320;
+    }
+
+    function isValidJournal(data) {
+      return data.userId == request.auth.uid &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
+        data.content is string && data.content.size() <= 50000 &&
+        data.tags is list && data.tags.size() <= 30 &&
+        data.mood is string && data.mood.size() <= 50;
+    }
+
+    function isValidJournalMessage(data) {
+      return data.userId == request.auth.uid &&
+        data.journalId is string &&
+        data.role is string && (data.role == 'user' || data.role == 'assistant') &&
+        data.content is string && data.content.size() <= 10000;
+    }
+
+    function isValidConversation(data) {
+      return data.userId == request.auth.uid &&
+        data.messages is list && data.messages.size() <= 200;
+    }
+
+    // User profile document: strictly isolated to the authenticated user
+    match /users/{userId} {
+      allow get, delete: if isOwner(userId) && isValidId(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data);
+      // Prevent user from transferring profile ownership or modifying foreign UID
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data) && request.resource.data.uid == resource.data.uid;
+
+      // Subcollection: Journals (User private journals)
+      match /journals/{journalId} {
+        allow get, list, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(journalId) && isValidJournal(request.resource.data);
+        // Prevent changing userId (ownership hijacking) or mutating original creation timestamp
+        allow update: if isOwner(userId) && isValidId(journalId) && isValidJournal(request.resource.data) &&
+          request.resource.data.userId == resource.data.userId &&
+          request.resource.data.createdAt == resource.data.createdAt;
+
+        // Subcollection: Journal Messages / Reflections
+        match /messages/{messageId} {
+          allow get, list, delete: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidId(messageId) && isValidJournalMessage(request.resource.data);
+          allow update: if isOwner(userId) && isValidId(messageId) && isValidJournalMessage(request.resource.data) &&
+            request.resource.data.userId == resource.data.userId;
+        }
+      }
+
+      // Subcollection: Conversations (Gemini brainstorm sessions)
+      match /conversations/{conversationId} {
+        allow get, list, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(conversationId) && isValidConversation(request.resource.data);
+        allow update: if isOwner(userId) && isValidId(conversationId) && isValidConversation(request.resource.data) &&
+          request.resource.data.userId == resource.data.userId;
+      }
+    }
+  }
+}
+
